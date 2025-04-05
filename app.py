@@ -2,6 +2,7 @@ import streamlit as st
 from sentence_transformers import SentenceTransformer, util
 import google.generativeai as genai
 import json
+from questions import QUESTION_DICT  # 別ファイルからインポート
 
 # 文章の類似度判定用にSentence-BERTモデルをロード
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
@@ -11,56 +12,37 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 # Geminiモデルの準備
 model_genai = genai.GenerativeModel("gemini-1.5-flash")
 
-# あらかじめ用意しておく想定の質問リスト
-QUESTION_DICT = {
-    'question1': {
-        'question': '自己PRをお願いします', 
-        'correct_genre_labels': '...', 
-        'correct_assumption_labels': '...', 
-        'emphasis': '...'},
-    'question2':{
-        "question": "学生時代に頑張ったことは何ですか？",
-        "correct_genre_labels": "...",
-        "correct_assumption_labels": "...",
-        "emphasis": "..."
-    },
-    'question3':{
-        "question": "あなたの強みと弱みを教えてください",
-        "correct_genre_labels": "...",
-        "correct_assumption_labels": "...",
-        "emphasis": "..."
-    },
-    'question4':{
-        "question": "将来どのようなキャリアを築きたいですか？",
-        "correct_genre_labels": "...",
-        "correct_assumption_labels": "...",
-        "emphasis": "..."
-    },
-    'question5':{
-        "question": "志望動機を教えてください",
-        "correct_genre_labels": "...",
-        "correct_assumption_labels": "...",
-        "emphasis": "...",
-    }
-}
+# 想定の質問リストのkey
+QUESTION_LIST = [QUESTION_DICT[key]['question'] for key in QUESTION_DICT]
+# 選択された想定の質問リストの情報を取得するためのkey
+QUESTION_text_to_data = {data["question"]: data for data in QUESTION_DICT.values()}
 
 def main():
+    if "display_text" not in st.session_state:
+        question = ""
+
     st.title("面接コミュニケーション養成アプリ")
 
     # --- Step 1: 質問の選択 ---
     if st.button("質問を生成する"):
         question_data = generate_question_with_labels()
         st.session_state["question_data"] = question_data
+        question = question_data["question"]
     # 質問データの保持
     if "question_data" not in st.session_state:
         st.session_state["question_data"] = generate_question_with_labels()
-    question_data = st.session_state["question_data"]
-    question = question_data["question"]
-    st.write("【質問】", question_data["question"])
-    #st.write("【重視点】", question_data["emphasis"])    
+    question_data = st.session_state["question_data"] 
 
-    if st.button("リストから質問を選ぶ"):
-        question = st.selectbox("面接質問を選んでください", QUESTION_DICT.values())
+    # 想定された質問の表示
+    selected = st.selectbox("または面接質問を選んでください", QUESTION_LIST)
+    select_question = selected
+
+    # 選択された質問の表示
+    if question:
+        st.write("**【質問】**", question)
+    else:
+        st.write("**【質問】**", select_question)
+        question_data = QUESTION_text_to_data[select_question]
 
     # --- Step 2: 回答入力 ---
     answer = st.text_area("この質問に対するあなたの回答を入力してください")
@@ -80,7 +62,7 @@ def main():
         else:
             st.warning("回答が質問からズレている可能性があります。")
 
-        # 文章の長さチェック
+        # 【B】文章の長さチェック
         word_count = len(answer)
         st.write(f"回答文字数: {word_count} 語")
         if word_count < 250:
@@ -90,15 +72,15 @@ def main():
 
         st.write("---")
 
-        # Gemini
+        # 【C】Geminiを用いて評価する
         question_feedback = f'''
-                            あなたは面接官です。「{question}」という質問に対して「{answer}」と答えられました。これに関してフィードバックを簡潔にお願いします。
+                            あなたは面接官です。「{question_data["question"]}」という質問に対して「{answer}」と答えられました。これに関してフィードバックを簡潔にお願いします。
                             評価の基準は以下の5つです。
                             ・質問のジャンル「{question_data['correct_genre_labels']}」に即しているか？
                             ・回答に含まれるべき前提「{question_data['correct_assumption_labels']}」を満たしているか？
                             ・面接官が評価したい観点「{question_data['emphasis']}」について十分に言及されているか？
                             ・文章構成が結論、理由になっているか？
-                            ・誤字脱字がないきちんとした文章であるか？
+                            ・誤字脱字がない、きちんとした文章であるか？
                             '''
         response = model_genai.generate_content(question_feedback)
         st.write("**フィードバック**")
@@ -120,13 +102,15 @@ def generate_question_with_labels():
             "emphasis": "..."
             }
             """
+    
     response = model_genai.generate_content(prompt)
     lines = response.text.splitlines()
     json_str = "\n".join(lines[1:len(lines)-1]).strip()
-    # d:responseを辞書に変更
-    d = json.loads(json_str)
+    # responseを辞書に変更
+    question_data = json.loads(json_str)
+
     try:
-        return d
+        return question_data
     except Exception as e:
         st.error("質問の自動生成に失敗しました: " + str(e))
         return {

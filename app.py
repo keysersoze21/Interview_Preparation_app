@@ -123,7 +123,7 @@ def generate_question_with_labels():
     response = model_genai.generate_content(prompt)
     lines = response.text.splitlines()
     json_str = "\n".join(lines[1:len(lines)-1]).strip()
-    # d:responseを辞書に変更
+    # d:responseを辞書に変更する
     d = json.loads(json_str)
     try:
         return d

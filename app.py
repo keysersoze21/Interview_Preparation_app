@@ -20,6 +20,11 @@ QUESTION_text_to_data = {data["question"]: data for data in QUESTION_DICT.values
 def main():
     if "display_text" not in st.session_state:
         question = ""
+        select_question = QUESTION_LIST[0]
+    if "select_question" not in st.session_state:
+        select_question = QUESTION_LIST[0]
+    if "show_selectbox" not in st.session_state:
+        st.session_state.show_selectbox = False
 
     st.title("面接コミュニケーション養成アプリ")
 
@@ -28,27 +33,36 @@ def main():
         question_data = generate_question_with_labels()
         st.session_state["question_data"] = question_data
         question = question_data["question"]
+        st.session_state.show_selectbox = False
+        select_question = QUESTION_LIST[0]
     # 質問データの保持
     if "question_data" not in st.session_state:
         st.session_state["question_data"] = generate_question_with_labels()
     question_data = st.session_state["question_data"] 
 
     # 想定された質問の表示
-    selected = st.selectbox("または面接質問を選んでください", QUESTION_LIST)
-    select_question = selected
+    if st.button("リストから質問を選ぶ"):
+        st.session_state.show_selectbox = True
+    # 「リストから質問を選ぶ」が実行されたときに表示する
+    if st.session_state.show_selectbox:
+        question = ""
+        default_index = QUESTION_LIST.index(select_question)
+        selected = st.selectbox("または面接質問を選んでください", QUESTION_LIST, index=default_index)
+        select_question = selected
 
     # 選択された質問の表示
     if question:
-        st.write("**【質問】**", question)
-    else:
-        st.write("**【質問】**", select_question)
+        question_data = st.session_state["question_data"] 
+    elif select_question != QUESTION_LIST[0]:
         question_data = QUESTION_text_to_data[select_question]
-
+    st.write("**【質問】**", question_data['question'])
+    
     # --- Step 2: 回答入力 ---
     answer = st.text_area("この質問に対するあなたの回答を入力してください")
 
     # --- Step 3: 回答を分析するボタン ---
     if st.button("回答を分析する"):
+        st.write(question_data)
         # 【A】Sentence-BERTを使った簡易的な類似度分析
         q_embedding = model.encode(question_data["question"], convert_to_tensor=True)
         a_embedding = model.encode(answer, convert_to_tensor=True)

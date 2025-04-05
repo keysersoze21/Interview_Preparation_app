@@ -101,7 +101,7 @@ def main():
                             ・誤字脱字がないきちんとした文章であるか？
                             '''
         response = model_genai.generate_content(question_feedback)
-        st.write("フィードバック")
+        st.write("**フィードバック**")
         st.write(response.text)
 
 # Gemini APIで質問生成

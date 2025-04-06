@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import time
 import json
 from questions import QUESTION_DICT  # 別ファイルからインポート
 
@@ -22,7 +23,7 @@ def main():
     if "show_selectbox" not in st.session_state:
         st.session_state.show_selectbox = False
 
-    st.title("面接コミュニケーション養成アプリ")
+    st.title("1次面接フィードバッカー")
 
     # --- Step 1: 質問の選択 ---
     if st.button("質問を生成する"):
@@ -48,17 +49,26 @@ def main():
 
     # 選択された質問の表示
     if question:
-        question_data = st.session_state["question_data"] 
+        question_data = st.session_state["question_data"]
     elif select_question != QUESTION_LIST[0]:
         question_data = QUESTION_text_to_data[select_question]
     st.write("**【質問】**", question_data['question'])
     
+    # フィードバックのレベルを選択
+    select_level = st.radio(label='面接官の厳しさを選択してください',
+                            options=('厳しいって(泣)', 'ガチで危機感持った方がいい'),
+                            index=0,
+                            horizontal=True)
+    if select_level == '厳しいって(泣)':
+        select_level_word = '評価は優しめでお願いします。よほど酷いものでなければ褒めてあげてください。'
+    elif select_level == 'ガチで危機感持った方がいい':
+        select_level_word = '評価は厳しめでお願いします。厳しさの中にも少し優しさを出してください。'
+
     # --- Step 2: 回答入力 ---
     answer = st.text_area("この質問に対するあなたの回答を入力してください")
 
     # --- Step 3: 回答を分析するボタン ---
     if st.button("回答を分析する"):
-        st.write(question_data)
         # 【A】文章の長さチェック
         word_count = len(answer)
         st.write(f"回答文字数: {word_count} 語")
@@ -73,6 +83,7 @@ def main():
         question_feedback = f'''
                             あなたは面接官です。「{question_data["question"]}」という質問に対して「{answer}」と答えられました。これに関してフィードバックを簡潔にお願いします。
                             評価の基準は以下の2つです。
+                            {select_level_word}
                             ・回答のジャンルが質問で要求しているジャンル「{question_data['correct_genre_labels']}」に含まれているか？
                                 回答のジャンルが質問で要求しているジャンルに含まれていない例)
                                     Q:「昼ごはんは何食べたい？」

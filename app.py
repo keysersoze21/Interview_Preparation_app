@@ -83,7 +83,8 @@ def main():
         if st.button("回答を分析する"):
             # 【A】Geminiを用いて評価する
             question_feedback = f'''
-                    あなたは面接官です。「{question_data["question"]}」という質問に対して「{answer}」と答えられました。これに関してフィードバックを簡潔にお願いします。
+                    あなたは面接官です。「{question_data["question"]}」という質問に対して「{answer}」と答えられました。
+                    就活生に向けてフィードバックを簡潔にお願いします。
                     {select_level_word}
                     また空欄の場合はフィードバックはできないと答えてください。
                     評価の基準は以下の2つです。

@@ -1,11 +1,7 @@
 import streamlit as st
-from sentence_transformers import SentenceTransformer, util
 import google.generativeai as genai
 import json
 from questions import QUESTION_DICT  # 別ファイルからインポート
-
-# 文章の類似度判定用にSentence-BERTモデルをロード
-model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
 # Gemini API設定（APIキーは環境変数やsecretsに保存して使ってください）
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -63,20 +59,7 @@ def main():
     # --- Step 3: 回答を分析するボタン ---
     if st.button("回答を分析する"):
         st.write(question_data)
-        # 【A】Sentence-BERTを使った簡易的な類似度分析
-        q_embedding = model.encode(question_data["question"], convert_to_tensor=True)
-        a_embedding = model.encode(answer, convert_to_tensor=True)
-        similarity = util.cos_sim(q_embedding, a_embedding)[0][0].item()
-
-        st.write(f"**質問との類似度スコア (Sentence-BERT)**: {similarity:.2f}")
-
-        # 類似度に基づく超簡易フィードバック
-        if similarity > 0.5:
-            st.success("質問にある程度沿った回答ができています！")
-        else:
-            st.warning("回答が質問からズレている可能性があります。")
-
-        # 【B】文章の長さチェック
+        # 【A】文章の長さチェック
         word_count = len(answer)
         st.write(f"回答文字数: {word_count} 語")
         if word_count < 250:
@@ -86,7 +69,7 @@ def main():
 
         st.write("---")
 
-        # 【C】Geminiを用いて評価する
+        # 【B】Geminiを用いて評価する
         question_feedback = f'''
                             あなたは面接官です。「{question_data["question"]}」という質問に対して「{answer}」と答えられました。これに関してフィードバックを簡潔にお願いします。
                             評価の基準は以下の2つです。
@@ -103,11 +86,11 @@ def main():
                                 質問の前提と回答の前提が一致していない例)
                                     Q:「昼ごはんはTDSのどこで食べたい？」
                                     A:「マクドナルド」
-                                    QはTDSの中で食べる前提で話しているが，Aはその点を考慮していない
+                                    QはTDSの中で食べる前提で話しているが、Aはその点を考慮していない
                                 質問の前提と回答の前提が一致している例)
                                     Q:「昼ごはんはTDSのどこで食べたい？」
                                     A:「リストランテ ディ カナレット」
-                                    QはTDSの中で食べる前提で話しており，Aはその点を考慮している．
+                                    QはTDSの中で食べる前提で話しており、Aはその点を考慮している
                             '''
         response = model_genai.generate_content(question_feedback)
         st.write("**フィードバック**")

@@ -18,28 +18,36 @@ def main():
     if "display_text" not in st.session_state:
         question = ""
         select_question = QUESTION_LIST[0]
+        response = ""
     if "select_question" not in st.session_state:
         select_question = QUESTION_LIST[0]
     if "show_selectbox" not in st.session_state:
         st.session_state.show_selectbox = False
 
-    st.title("1次面接フィードバッカー")
+    st.markdown("<h1 style='text-align: center;'>1次面接フィードバッカー</h1>", 
+                unsafe_allow_html=True)
 
     # --- Step 1: 質問の選択 ---
-    if st.button("質問を生成する"):
-        question_data = generate_question_with_labels()
-        st.session_state["question_data"] = question_data
-        question = question_data["question"]
-        st.session_state.show_selectbox = False
-        select_question = QUESTION_LIST[0]
-    # 質問データの保持
-    if "question_data" not in st.session_state:
-        st.session_state["question_data"] = generate_question_with_labels()
-    question_data = st.session_state["question_data"] 
 
-    # 想定された質問の表示
-    if st.button("リストから質問を選ぶ"):
-        st.session_state.show_selectbox = True
+    # 2つのボタンをそれぞれ真ん中に配置
+    _, col1, col2, _ = st.columns(4)
+
+    with col1:
+        if st.button("質問を生成する"):
+            question_data = generate_question_with_labels()
+            st.session_state["question_data"] = question_data
+            question = question_data["question"]
+            st.session_state.show_selectbox = False
+            select_question = QUESTION_LIST[0]
+        # 質問データの保持
+        if "question_data" not in st.session_state:
+            st.session_state["question_data"] = generate_question_with_labels()
+        question_data = st.session_state["question_data"] 
+
+    with col2:
+        # 想定された質問の表示
+        if st.button("定番の質問を選ぶ"):
+            st.session_state.show_selectbox = True
     # 「リストから質問を選ぶ」が実行されたときに表示する
     if st.session_state.show_selectbox:
         question = ""
@@ -55,7 +63,7 @@ def main():
     st.write("**【質問】**", question_data['question'])
     
     # フィードバックのレベルを選択
-    select_level = st.radio(label='面接官の厳しさを選択してください',
+    select_level = st.radio(label='面接官の難易度を選択してください',
                             options=('厳しいって(泣)', 'ガチで危機感持った方がいい'),
                             index=0,
                             horizontal=True)
@@ -65,45 +73,53 @@ def main():
         select_level_word = '評価は厳しめでお願いします。厳しさの中にも少し優しさを出してください。'
 
     # --- Step 2: 回答入力 ---
-    answer = st.text_area("この質問に対するあなたの回答を入力してください")
+    answer = st.text_area("この質問に対するあなたの回答を入力してください", height=300)
 
     # --- Step 3: 回答を分析するボタン ---
-    if st.button("回答を分析する"):
-        # 【A】文章の長さチェック
+    # 回答を分析するボタンを右詰めに配置
+    _, col3 = st.columns([3, 1])
+
+    with col3:
+        if st.button("回答を分析する"):
+            # 【A】Geminiを用いて評価する
+            question_feedback = f'''
+                                あなたは面接官です。「{question_data["question"]}」という質問に対して「{answer}」と答えられました。これに関してフィードバックを簡潔にお願いします。
+                                {select_level_word}
+                                また空欄の場合はフィードバックはできないと答えてください。
+                                評価の基準は以下の2つです。
+                                ・回答のジャンルが質問で要求しているジャンル「{question_data['correct_genre_labels']}」に含まれているか？
+                                    回答のジャンルが質問で要求しているジャンルに含まれていない例)
+                                        Q:「昼ごはんは何食べたい？」
+                                        A:「さくらチョコチップフラペチーノ」
+                                        昼ごはんはごはんに含まれるが，さくらチョコチップフラペチーノはごはんに含まれない
+                                    回答のジャンルが質問で要求しているジャンルに含まれている例)
+                                        Q:「昼ごはんは何食べたい？」
+                                        A:「チャーハン」
+                                        昼ごはんはごはんに含まれており，チャーハンはごはんに含まれいる 
+                                ・質問の前提「{question_data['correct_assumption_labels']}」と回答の前提が一致しているか？
+                                    質問の前提と回答の前提が一致していない例)
+                                        Q:「昼ごはんはTDSのどこで食べたい？」
+                                        A:「マクドナルド」
+                                        QはTDSの中で食べる前提で話しているが、Aはその点を考慮していない
+                                    質問の前提と回答の前提が一致している例)
+                                        Q:「昼ごはんはTDSのどこで食べたい？」
+                                        A:「リストランテ ディ カナレット」
+                                        QはTDSの中で食べる前提で話しており、Aはその点を考慮している
+                                '''
+            response = model_genai.generate_content(question_feedback)
+    
+    # 【B】文章の長さチェック
+    if response:
         word_count = len(answer)
-        st.write(f"回答文字数: {word_count} 語")
+        st.write("")
+        st.write("---")
+        st.write(f"回答文字数: **{word_count}** 語")
         if word_count < 250:
             st.info("回答が短めです。もう少し具体例を加えると良いかもしれません。")
         elif word_count > 350:
             st.info("回答が長すぎる可能性があります。要点を簡潔にまとめましょう。")
 
         st.write("---")
-
-        # 【B】Geminiを用いて評価する
-        question_feedback = f'''
-                            あなたは面接官です。「{question_data["question"]}」という質問に対して「{answer}」と答えられました。これに関してフィードバックを簡潔にお願いします。
-                            評価の基準は以下の2つです。
-                            {select_level_word}
-                            ・回答のジャンルが質問で要求しているジャンル「{question_data['correct_genre_labels']}」に含まれているか？
-                                回答のジャンルが質問で要求しているジャンルに含まれていない例)
-                                    Q:「昼ごはんは何食べたい？」
-                                    A:「さくらチョコチップフラペチーノ」
-                                    昼ごはんはごはんに含まれるが，さくらチョコチップフラペチーノはごはんに含まれない
-                                回答のジャンルが質問で要求しているジャンルに含まれている例)
-                                    Q:「昼ごはんは何食べたい？」
-                                    A:「チャーハン」
-                                    昼ごはんはごはんに含まれており，チャーハンはごはんに含まれいる 
-                            ・質問の前提「{question_data['correct_assumption_labels']}」と回答の前提が一致しているか？
-                                質問の前提と回答の前提が一致していない例)
-                                    Q:「昼ごはんはTDSのどこで食べたい？」
-                                    A:「マクドナルド」
-                                    QはTDSの中で食べる前提で話しているが、Aはその点を考慮していない
-                                質問の前提と回答の前提が一致している例)
-                                    Q:「昼ごはんはTDSのどこで食べたい？」
-                                    A:「リストランテ ディ カナレット」
-                                    QはTDSの中で食べる前提で話しており、Aはその点を考慮している
-                            '''
-        response = model_genai.generate_content(question_feedback)
         st.write("**フィードバック**")
         st.write(response.text)
 

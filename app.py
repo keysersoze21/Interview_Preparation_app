@@ -52,7 +52,7 @@ def main():
     if st.session_state.show_selectbox:
         question = ""
         default_index = QUESTION_LIST.index(select_question)
-        selected = st.selectbox("または面接質問を選んでください", QUESTION_LIST, index=default_index)
+        selected = st.selectbox("次に面接質問を選んでください", QUESTION_LIST, index=default_index)
         select_question = selected
 
     # 選択された質問の表示
